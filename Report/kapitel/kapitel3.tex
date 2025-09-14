@@ -1,0 +1,90 @@
+% kapitel3.tex
+\chapter{Randomized Load Aware Path Selection Algorithmus}
+\label{chapter:algorithmus2}
+\graphicspath{{../bilder/}}
+
+Der \texttt{RandomizedLoadAwarePathSelection}-Algorithmus ist ein heuristischer, teilweise randomisierter Routing-Algorithmus, der entworfen wurde, um Netzwerke gegen lokale Überlastung zu schützen und gleichzeitig kurze Pfade beizubehalten. Er wählt für jede Demand mehrere Kandidatenpfade (in diesem Fall nicht alle mögliche Pfade, nur k-shortest wegen begrenzten Resourcen), wählt daraus zufällig drei Pfade und bewertet jeden Pfad mit einer lastbasierten Funktion. Danach wird der beste der drei Pfade gewählt und als optimaler Pfad gesetzt. Dort, wo deterministische Shortest-Path-Strategien zu Hotspots führen, erzeugt die kontrollierte Randomisierung Diversität in der Pfadwahl und verteilt so den Datenverkehr im Netz.
+
+\section{Warum wurde der Algorithmus entwickelt?}
+
+Ziel war es, eine einfache, praktisch einsetzbare Methode zu entwickeln, die folgende Anforderungen erfüllt:
+
+\begin{itemize}
+\item \textbf{Lastverteilung}: Vermeidung von starken Auslastungsspitzen (hohe MLU) durch bewusstes Umgehen bereits stark ausgelasteter Links und durch Verteilung des Traffics im Netz zur Verbesserung der ALU.
+\item \textbf{Einfachheit}: Der Algorithmus ist verständlich und intuitiv implementierbar.
+\item \textbf{Robustheit gegenüber Eingangsvariationen}: Kleine Änderungen in den Demands oder Topologie sollten nicht sofort zu dramatischen Verschlechterungen führen.
+\end{itemize}
+
+\section{Warum sind randomisierte Algorithmen in Routing nützlich?}
+
+Randomisierung ist in Routing-Kontexten aus mehreren Gründen vorteilhaft:
+
+\begin{itemize}
+    \item \textbf{Diversität statt Konvergenz auf Hotspots}: Deterministische Algorithmen wählen häufig dieselben minimalen Pfade für viele Demand-Paare. Kleine Zufallsentscheidungen vermeiden Hotspotserstellung und sorgen für bessere Verteilung von Traffic durch das Netz.
+    \item \textbf{Reale Lastprognose}: In realen Netzen liegen oft unsichere oder variable Lasten zugrunde; die randomisierte Auswahl modelliert diese Unsicherheit besser.
+    \item \textbf{Einfachheit der Implementierung}: Randomisierte Auswahl kann oft leicht zu bestehenden heuristischen Verfahren hinzugefügt werden, ohne auf komplexe globale Optimierer angewiesen zu sein.
+\end{itemize}
+
+\section{Wie der Algorithmus funktioniert}
+
+Kurzüberblick:
+
+\begin{enumerate}
+    \item Baue einen Graphen mit Kantenkapazitäten und optionalen Kantengewichtungen auf.
+    \item Für jede Demand berechne eine Liste von k-shortest paths und wähle daraus 3 Kandidaten randomisiert (Oversampling).
+    \item Bewerte jeden Kandidatenpfad anhand einer Lastfunktion, die die derzeit erwartete Linkauslastung berücksichtigt.
+    \item Wähle den besten Pfad (minimaler Score). Trage die Last ein und aktualisiere die lokalen Lastinformationen.
+\end{enumerate}
+
+\section{Bewertungsfunktion}
+Sei $P$ ein Pfad bestehend aus Kanten $(e_1,\dots,e_m)$ und $d$ die Demand-Größe. Mit $f_e$ der bisher auf $e$ geplanten Last und $c_e$ der Kapazität gilt die Pfadbewertungsfunktion
+
+$$
+\mathrm{score}(P,d) \,=\, \sum_{e\in P} \frac{f_e + d}{c_e}
+$$
+
+Diese Wahl zielt direkt darauf ab, die entstehende Auslastung auf den von $P$ genutzten Links zu minimieren.
+
+\section{Pseudocode}
+\begin{verbatim}
+    for each demand (s,t,d):
+    candidates = k_shortest_paths(G,s,t,K,oversample)
+    sampled = random_sample(candidates, K)
+    best = argmin_{p in sampled} score(p; d, flow\_map)
+    assign best: update flow_map and G loads
+    return waypoints, metrics (MLU, ALU, ...)
+\end{verbatim}
+
+
+\section{Komplexität}
+
+Sei $D$ die Anzahl der Demands, $K$ die Anzahl der ausgewählten Kandidaten pro Demand, $L$ die durchschnittliche Pfadlänge und $T_{ksp}$ die Kosten, um $k$-kürzeste Pfade zu berechnen. Dann ist die Laufzeit ungefähr:
+
+$$
+O\bigl(D\cdot (T_{ksp} + K\cdot L)\bigr)
+$$
+
+
+\section{Vorteile und Limitationen}
+\paragraph{Vorteile}
+\begin{itemize}
+    \item \textbf{Einfache Realisierbarkeit}: Es sind nur lokale Lastinformationen nötig.
+    \item \textbf{Verbesserte Lastverteilung}: gezielte Vermeidung bereits ausgelasteter Links reduziert MLU in vielen Szenarien. Die Methode verbessert die ALU durch randomisierte Pfadverteilung.
+    \item \textbf{Parametersteuerung}: K, Oversample und die Gewichtung erlauben eine Steuerung zwischen Exploration und Exploitation.
+\end{itemize}
+
+\paragraph{Limitationen}
+\begin{itemize}
+    \item \textbf{Kein globales Optimum}: Algorithmische Heuristik - keine Garantie auf optimale MLU/ALU.
+    \item \textbf{Reihenfolgensensitiv}: die Reihenfolge, in der Demands abgearbeitet werden, beeinflusst das Ergebnis (Greedy-Verhalten).
+    \item \textbf{Determinismus/Statistik}: Randomisierte Entscheidungen erfordern statistische Auswertung (mehrere Durchläufe zur Mittelwertermittlung).
+    \item \textbf{Skalierung bei sehr großen Netzen}: k-shortest-Berechnung teuer.
+\end{itemize}
+
+\section{Mögliche Verbesserungen}
+\begin{enumerate}
+    \item \textbf{Probabilistische Wahl statt argmin}: Statt strikt das Minimum zu wählen, könnte ein Softmax-/Boltzmann-Verfahren verwendet werden, das schlechtere Pfade mit niedriger Wahrscheinlichkeit auswählt - es erhöht die Exploration und reduziert die Varianz.
+    \item \textbf{Adaptive K und Oversample}: Wähle K abhängig vom Knotengrad, von der Nachfragegröße, von der Menge verfügbarer Ressourcen oder von der aktuellen Netzbelastung.
+    \item \textbf{Reihenfolge-Randomisierung/Priorisierung}: Zuerst große Demands oder latenzkritische Flows behandeln; alternativ die Reihenfolge pro Durchlauf randomisieren und die beste Lösung über mehrere Durchläufe wählen.
+    \item \textbf{Berücksichtigung von Latenz- oder Kosten-Tradeoffs}: Kombiniere den Last-Score mit der Pfadlänge in einer gewichteten Zielfunktion.
+\end{enumerate}
