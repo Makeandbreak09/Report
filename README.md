@@ -1,5 +1,5 @@
 # Report
-This is the repository containing the report of the two other projects.
+This is the repository containing the report of the other two projects.
 
 Report: [Routingalgorithmen_Report](Routingalgorithmen_Report.pdf)
 
